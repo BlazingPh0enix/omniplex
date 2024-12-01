@@ -9,8 +9,9 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@firebase/firestore": "^4.5.0",
-    "@firebase/storage": "^0.12.2",
+    "@firebase/auth": "^1.5.1",
+    "@firebase/firestore": "^4.4.0",
+    "@firebase/storage": "^0.12.0",
     "@headlessui/react": "^2.0.3",
     "@headlessui/tailwindcss": "^0.2.0",
     "@heroicons/react": "^2.1.1",
@@ -24,7 +25,7 @@
     "@vercel/og": "^0.6.2",
     "@vercel/speed-insights": "^1.0.10",
     "ai": "^3.0.12",
-    "firebase": "^10.9.0",
+    "firebase": "^10.7.0",
     "formidable": "^3.5.1",
     "framer-motion": "^11.0.15",
     "googleapis": "^134.0.0",
