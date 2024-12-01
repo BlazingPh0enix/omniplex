@@ -5,8 +5,9 @@ import Auth from "../Auth/Auth";
 import SpinnerWhite from "../SpinnerWhite/SpinnerWhite";
 import { useRouter } from "next/navigation";
 import { Skeleton } from "@nextui-org/skeleton";
-import { useDisclosure } from "@nextui-org/modal";
+import { useDisclosure } from "@nextui-org/react";
 import { ScrollShadow } from "@nextui-org/scroll-shadow";
+import { Button } from "@nextui-org/react";
 import {
   formatTimestamp,
   getRelativeDateLabel,
@@ -116,15 +117,26 @@ const History = () => {
                 alt="Chat Empty"
                 className={styles.emptyStateIcon}
               />
-              <p className={styles.emptyStateText}>No Chat History</p>
+              <p className={styles.emptyStateText}>
+                {isAuthenticated ? "No Chat History" : "Sign in to view chat history"}
+              </p>
+              {!isAuthenticated && (
+                <Button
+                  className="mt-4"
+                  color="primary"
+                  variant="solid"
+                  onPress={handleAuth}
+                >
+                  Sign In
+                </Button>
+              )}
             </div>
           ) : (
             chatHistory.map((item, index, array) => {
               const formattedDate = formatTimestamp(item.createdAt);
               const header =
                 index === 0 ||
-                formattedDate !==
-                  formatTimestamp(array[index - 1].createdAt) ? (
+                formattedDate !== formatTimestamp(array[index - 1].createdAt) ? (
                   <div key={`header-${index}`} className={styles.listHeader}>
                     {getRelativeDateLabel(formattedDate)}
                   </div>
@@ -159,13 +171,6 @@ const History = () => {
           )}
         </div>
       </ScrollShadow>
-      {!isAuthenticated && (
-        <div className={styles.modalOverlay}>
-          <div className={styles.button} onClick={handleAuth}>
-            Sign In
-          </div>
-        </div>
-      )}
       <Auth isOpen={isOpen} onClose={onClose} />
     </div>
   );

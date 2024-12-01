@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { OpenAIStream, StreamingTextResponse } from "ai";
+import { streamText } from "ai";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -18,17 +18,40 @@ export async function POST(req: Request) {
     presence_penalty,
   } = await req.json();
 
-  const response = await openai.chat.completions.create({
-    stream: true,
-    model: model,
-    temperature: temperature,
-    max_tokens: max_tokens,
-    top_p: top_p,
-    frequency_penalty: frequency_penalty,
-    presence_penalty: presence_penalty,
-    messages: messages,
-  });
+  try {
+    const response = await openai.chat.completions.create({
+      model: model,
+      messages: messages,
+      temperature: temperature,
+      max_tokens: max_tokens,
+      top_p: top_p,
+      frequency_penalty: frequency_penalty,
+      presence_penalty: presence_penalty,
+      stream: true,
+    });
 
-  const stream = OpenAIStream(response);
-  return new StreamingTextResponse(stream);
+    // Create a new Response with the stream
+    return new Response(
+      new ReadableStream({
+        async start(controller) {
+          for await (const chunk of response) {
+            const content = chunk.choices[0]?.delta?.content || '';
+            if (content) {
+              controller.enqueue(new TextEncoder().encode(content));
+            }
+          }
+          controller.close();
+        },
+      }),
+      {
+        headers: {
+          'Content-Type': 'text/plain; charset=utf-8',
+          'Transfer-Encoding': 'chunked',
+        },
+      }
+    );
+  } catch (error) {
+    console.error('Error:', error);
+    return new Response('Error processing your request', { status: 500 });
+  }
 }

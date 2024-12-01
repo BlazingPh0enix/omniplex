@@ -4,7 +4,7 @@ import Image from "next/image";
 import Auth from "../Auth/Auth";
 import SpinnerWhite from "../SpinnerWhite/SpinnerWhite";
 import { Skeleton } from "@nextui-org/skeleton";
-import { useDisclosure } from "@nextui-org/modal";
+import { useDisclosure } from "@nextui-org/react";
 import { ScrollShadow } from "@nextui-org/scroll-shadow";
 import { getRelativeDateLabel, cutString } from "@/utils/utils";
 import { LibraryItem } from "@/utils/types";
@@ -22,6 +22,7 @@ import { db } from "../../../firebaseConfig";
 
 import Bin from "../../../public/svgs/Bin.svg";
 import FolderInactive from "../../../public/svgs/sidebar/Folder_Inactive.svg";
+import { Button } from "@nextui-org/react";
 
 const Library = () => {
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -94,7 +95,19 @@ const Library = () => {
                 alt="Folder Empty"
                 className={styles.emptyStateIcon}
               />
-              <p className={styles.emptyStateText}>No Documents Uploaded</p>
+              <p className={styles.emptyStateText}>
+                {isAuthenticated ? "No Documents Uploaded" : "Sign in to view documents"}
+              </p>
+              {!isAuthenticated && (
+                <Button
+                  className="mt-4"
+                  color="primary"
+                  variant="solid"
+                  onPress={handleAuth}
+                >
+                  Sign In
+                </Button>
+              )}
             </div>
           ) : (
             libraryData.map((item, index, array) => {
@@ -128,13 +141,6 @@ const Library = () => {
           )}
         </div>
       </ScrollShadow>
-      {!isAuthenticated && (
-        <div className={styles.modalOverlay}>
-          <div className={styles.button} onClick={handleAuth}>
-            Sign In
-          </div>
-        </div>
-      )}
       <Auth isOpen={isOpen} onClose={onClose} />
     </div>
   );

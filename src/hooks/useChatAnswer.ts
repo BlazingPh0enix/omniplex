@@ -100,30 +100,43 @@ const useChatAnswer = ({
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let answer = "";
-        while (true) {
-          const { value, done } = await reader.read();
-          const text = decoder.decode(value);
-          answer += text;
+
+        try {
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+
+            // Decode the chunk and update the UI
+            const text = decoder.decode(value);
+            answer += text;
+            
+            dispatch(
+              updateAnswer({
+                threadId,
+                chatIndex: chatThread.chats.length - 1,
+                answer,
+              })
+            );
+          }
+
+          // Add the complete message to the thread
           dispatch(
-            updateAnswer({
+            addMessage({
               threadId,
-              chatIndex: chatThread.chats.length - 1,
-              answer: answer,
+              message: { role: "assistant", content: answer },
             })
           );
-          if (done) {
-            break;
+
+          setIsStreaming(false);
+          setIsCompleted(true);
+          handleSave();
+        } catch (error) {
+          if ((error as Error).name === "AbortError") {
+            await handleSave();
+            return;
           }
+          throw error;
         }
-        dispatch(
-          addMessage({
-            threadId,
-            message: { role: "assistant", content: answer },
-          })
-        );
-        setIsStreaming(false);
-        setIsCompleted(true);
-        handleSave();
       }
     } catch (error) {
       setIsLoading(false);
