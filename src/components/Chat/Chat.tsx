@@ -16,6 +16,7 @@ import {
   updateSearch,
   updateStock,
   updateWeather,
+  updateAnswer
 } from "@/store/chatSlice";
 import { Chat as ChatType } from "../../utils/types";
 import { generateCitations } from "../../utils/utils";
@@ -25,6 +26,8 @@ import useChatFetch from "@/hooks/useChatFetch";
 import useChatFork from "@/hooks/useChatFork";
 import useChatRetry from "@/hooks/useChatRetry";
 import useChatAnswer from "@/hooks/useChatAnswer";
+
+import { readStreamableValue } from 'ai/rsc';
 
 type Props = {
   id: string;
@@ -44,6 +47,13 @@ const Chat = (props: Props) => {
   const [error, setError] = useState("");
   const [errorFunction, setErrorFunction] = useState<Function | null>(null);
 
+  const [model, setModel] = useState("gpt-3.5-turbo");
+  const [temperature, setTemperature] = useState(0.7);
+  const [maxLength, setMaxLength] = useState(1000);
+  const [topP, setTopP] = useState(1);
+  const [frequency, setFrequency] = useState(0);
+  const [presence, setPresence] = useState(0);
+
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -60,6 +70,12 @@ const Chat = (props: Props) => {
     setIsStreaming,
     setIsLoading,
     setIsCompleted,
+    model,
+    temperature,
+    maxLength,
+    topP,
+    frequency,
+    presence,
   });
 
   // Production Code
@@ -397,7 +413,7 @@ const Chat = (props: Props) => {
         );
 
         if (!response.ok) {
-          throw new Error("Failed to fetch weather data");
+          throw new Error("Failed to fetch stock data");
         }
 
         const stocksData = await response.json();
@@ -434,7 +450,7 @@ const Chat = (props: Props) => {
         );
 
         if (!response.ok) {
-          throw new Error("Failed to fetch weather data");
+          throw new Error("Failed to fetch dictionary data");
         }
 
         const dictionaryData = await response.json();

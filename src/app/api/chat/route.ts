@@ -1,8 +1,13 @@
 import OpenAI from "openai";
+import { streamText } from "ai";
+import { openai } from '@ai-sdk/openai';
 
-const openai = new OpenAI({
+const openAI = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+import { createStreamableValue } from 'ai/rsc';
+
+export const runtime = 'edge';
 
 export async function POST(req: Request) {
   const {
@@ -15,40 +20,30 @@ export async function POST(req: Request) {
     presence_penalty,
   } = await req.json();
 
-  try {
-    const response = await openai.chat.completions.create({
-      model: model,
-      messages: messages,
-      temperature: temperature,
-      max_tokens: max_tokens,
-      top_p: top_p,
-      frequency_penalty: frequency_penalty,
-      presence_penalty: presence_penalty,
-      stream: true,
-    });
+  const stream = createStreamableValue('');
 
-    // Create a new Response with the stream
-    return new Response(
-      new ReadableStream({
-        async start(controller) {
-          for await (const chunk of response) {
-            const content = chunk.choices[0]?.delta?.content || '';
-            if (content) {
-              controller.enqueue(new TextEncoder().encode(content));
-            }
-          }
-          controller.close();
-        },
-      }),
-      {
-        headers: {
-          'Content-Type': 'text/plain; charset=utf-8',
-          'Transfer-Encoding': 'chunked',
-        },
+  (async () => {
+    try {
+      const { textStream } = streamText({
+        model: openai(model || 'gpt-3.5-turbo'),
+        messages,
+        temperature: temperature || 0.7,
+        maxTokens: max_tokens || 1000,
+        topP: top_p || 1,
+        frequencyPenalty: frequency_penalty || 0,
+        presencePenalty: presence_penalty || 0,
+      });
+
+      for await (const text of textStream) {
+        stream.update(text);
       }
-    );
-  } catch (error) {
-    console.error('Error:', error);
-    return new Response('Error processing your request', { status: 500 });
-  }
+
+      stream.done();
+    } catch (error) {
+      console.error('Streaming error:', error);
+      stream.error(error);
+    }
+  })();
+
+  return stream.value;
 }

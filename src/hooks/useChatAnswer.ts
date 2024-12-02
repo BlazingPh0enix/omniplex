@@ -13,6 +13,7 @@ import { selectAI } from "@/store/aiSlice";
 import { store } from "@/store/store";
 import { doc, updateDoc } from "@firebase/firestore";
 import { db } from "../../firebaseConfig";
+import { readStreamableValue } from 'ai/rsc';
 
 type UseChatAnswerProps = {
   threadId: string;
@@ -22,6 +23,12 @@ type UseChatAnswerProps = {
   setIsStreaming: (isStreaming: boolean) => void;
   setIsLoading: (isLoading: boolean) => void;
   setIsCompleted: (isCompleted: boolean) => void;
+  model?: string;
+  temperature?: number;
+  maxLength?: number;
+  topP?: number;
+  frequency?: number;
+  presence?: number;
 };
 
 const useChatAnswer = ({
@@ -32,6 +39,12 @@ const useChatAnswer = ({
   setIsStreaming,
   setIsLoading,
   setIsCompleted,
+  model,
+  temperature,
+  maxLength,
+  topP,
+  frequency,
+  presence,
 }: UseChatAnswerProps) => {
   const dispatch = useDispatch();
   const userDetails = useSelector(selectUserDetailsState);
@@ -65,91 +78,79 @@ const useChatAnswer = ({
   };
 
   const handleAnswer = async (chat: ChatType, data?: string) => {
-    setIsLoading(true);
-    setIsCompleted(false);
-    const newController = new AbortController();
-    setController(newController);
-
-    let messages = getInitialMessages(chat, data);
     try {
+      setIsLoading(true);
+      setIsStreaming(true);
+      setIsCompleted(false);
+
+      const messages = getInitialMessages(chat, data);
+
       const response = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           messages,
-          model: chat?.mode === "image" ? "gpt-4o" : ai.model,
-          temperature: ai.temperature,
-          max_tokens: ai.maxLength,
-          top_p: ai.topP,
-          frequency_penalty: ai.frequency,
-          presence_penalty: ai.presence,
+          model: ai.model,
+          temperature: temperature || ai.temperature,
+          max_tokens: maxLength || ai.maxLength,
+          top_p: topP || ai.topP,
+          frequency_penalty: frequency || ai.frequency,
+          presence_penalty: presence || ai.presence,
         }),
-        signal: newController.signal,
       });
 
       if (!response.ok) {
-        setError("Something went wrong. Please try again later.");
-        setErrorFunction(() => handleAnswer.bind(null, chat, data));
-        return;
+        const errorText = await response.text();
+        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
       }
 
-      setIsLoading(false);
-      if (response.body) {
-        setError("");
-        setIsStreaming(true);
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let answer = "";
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let accumulatedText = "";
 
-        try {
-          while (true) {
-            const { value, done } = await reader.read();
-            if (done) break;
+      while (true) {
+        if (!reader) break;
+        const { done, value } = await reader.read();
+        if (done) break;
 
-            // Decode the chunk and update the UI
-            const text = decoder.decode(value);
-            answer += text;
-            
-            dispatch(
-              updateAnswer({
-                threadId,
-                chatIndex: chatThread.chats.length - 1,
-                answer,
-              })
-            );
-          }
+        const chunk = decoder.decode(value, { stream: true });
+        accumulatedText += chunk;
 
-          // Add the complete message to the thread
-          dispatch(
-            addMessage({
-              threadId,
-              message: { role: "assistant", content: answer },
-            })
-          );
-
-          setIsStreaming(false);
-          setIsCompleted(true);
-          handleSave();
-        } catch (error) {
-          if ((error as Error).name === "AbortError") {
-            await handleSave();
-            return;
-          }
-          throw error;
-        }
+        // Dispatch update with accumulated text
+        dispatch(
+          updateAnswer({
+            threadId,
+            chatIndex: chatThread.chats.length - 1,
+            answer: accumulatedText,
+          })
+        );
       }
-    } catch (error) {
-      setIsLoading(false);
+
       setIsStreaming(false);
       setIsCompleted(true);
-      if ((error as Error).name === "AbortError") {
-        await handleSave();
-        return;
+      setIsLoading(false);
+
+      // Optional: Save to Firestore if user is logged in
+      const userDetails = selectUserDetailsState(store.getState());
+      if (userDetails?.uid) {
+        const threadRef = doc(db, "users", userDetails.uid, "history", threadId);
+        await updateDoc(threadRef, {
+          [`chats.${chatThread.chats.length - 1}.answer`]: accumulatedText,
+        });
       }
-      setError("Something went wrong. Please try again later.");
-      setErrorFunction(() => handleAnswer.bind(null, chat, data));
-    } finally {
-      setController(null);
+    } catch (error) {
+      console.error("Error in handleAnswer:", error);
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : typeof error === 'string' 
+          ? error 
+          : 'An unknown error occurred';
+      setError(`Failed to get response: ${errorMessage}`);
+      setIsStreaming(false);
+      setIsLoading(false);
+      setErrorFunction(() => () => handleAnswer(chat, data));
     }
   };
 
@@ -200,12 +201,12 @@ const useChatAnswer = ({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messages,
-          model: lastChat.mode === "image" ? "gpt-4o" : ai.model,
-          temperature: ai.temperature,
-          max_tokens: ai.maxLength,
-          top_p: ai.topP,
-          frequency_penalty: ai.frequency,
-          presence_penalty: ai.presence,
+          model: lastChat.mode === "image" ? "gpt-4o" : model || ai.model,
+          temperature: temperature || ai.temperature,
+          max_tokens: maxLength || ai.maxLength,
+          top_p: topP || ai.topP,
+          frequency_penalty: frequency || ai.frequency,
+          presence_penalty: presence || ai.presence,
         }),
         signal: newController.signal,
       });

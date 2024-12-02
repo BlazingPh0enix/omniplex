@@ -11,16 +11,22 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  const apiUrl = `https://api.dictionaryapi.dev/api/v2/entries/en/${word}`;
+  // Split compound words and try to get definition for the main word
+  const words = word.split(" ");
+  const mainWord = words[0];  // Get the first word
+  const apiUrl = `https://api.dictionaryapi.dev/api/v2/entries/en/${mainWord}`;
 
   try {
     const response = await fetch(apiUrl);
 
     if (!response.ok) {
       return new NextResponse(
-        JSON.stringify({ error: "Failed to fetch definitions" }),
+        JSON.stringify({ 
+          error: "No definition found", 
+          message: `Could not find definition for "${word}". Tried looking up "${mainWord}"` 
+        }),
         {
-          status: response.status,
+          status: 404,
           headers: { "Content-Type": "application/json" },
         }
       );
